@@ -1,9 +1,0 @@
-so I am typing ek
-stop
-exit
-clc
-clear
-nano
-help
-stop
-esc
