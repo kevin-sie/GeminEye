@@ -8,11 +8,11 @@ import numpy as np
 import matplotlib.animation as animation
 
 PORT_NAME = '/dev/ttyUSB0'
-DMAX = 1500
+DMAX = 1500 # range
 IMIN = 0 
 IMAX = 50
-left = LED(17)
-right = LED(27)
+left = LED(17) #gpio
+right = LED(27) #gpio
 
 GLOBAL_ISAWSOMETHING_L = 0 #LED
 GLOBAL_ISAWSOMETHING_R = 0 #LED
@@ -22,8 +22,8 @@ def update_line(num, iterator):
     global GLOBAL_ISAWSOMETHING_R
     scan = next(iterator)
     
-    boundaryLeft = 5.2359
-    boundaryRight = 1.0472
+    boundaryLeft = 5.2359 # 300 degrees, 300-360 is the right
+    boundaryRight = 1.0472 # 60 degrees, 0-60 is the left
     iterator = 0
     offsets = np.array([(meas[0],np.radians(meas[1]), meas[2]) for meas in scan]) # if meas[1] < 225 and meas[1] > 315])
     min_size = 10
