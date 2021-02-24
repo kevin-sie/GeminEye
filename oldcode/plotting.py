@@ -1,3 +1,5 @@
+'''This code is used for only plotting lidar data'''
+
 '''Animates distances and measurment quality'''
 from rplidar import RPLidar
 import matplotlib.pyplot as plt
