@@ -9,16 +9,41 @@ from time import sleep
 left = LED(5)
 right = LED(6)
 # for audio
+# for audio
 import RPi.GPIO as GPIO
-buzzpin = 26 # 22 og, 26 new
+from time import sleep
+buzzpin = 13 # 22 og, 26 new, 13
 GPIO.setmode(GPIO.BCM) # gpio numbering
 GPIO.setup(buzzpin,GPIO.OUT)
+# new
+GPIO.output(buzzpin, GPIO.LOW)
+pwm = GPIO.PWM(buzzpin, 1400) # Set Frequency to 1 KHz
+pwm.start(0) # Set the starting Duty Cycle
+
+#for buzzer
+def beep():
+    """
+    for dc in range(0, 101, 1):
+        pwm.ChangeDutyCycle(dc)
+        sleep(0.001)
+    for dc in range(100, -1, -1):
+        pwm.ChangeDutyCycle(dc)
+        sleep(0.001)
+    """
+    dc = 0
+    pwm.ChangeDutyCycle(50)
+    while dc < 700000: # 101
+        dc = dc + 1
+        #pwm.ChangeDutyCycle(dc)
+        #time.sleep(0.001)
+    pwm.ChangeDutyCycle(0)
+
 
 #for GPS
 # import serial
 # option 1, using a lib
 ser = serial.Serial(
-    port='/dev/ttyAMA1', #ttyS0 old, ttyAMA1 new
+    port='/dev/ttyAMA0', #ttyS0 old, ttyAMA1 new
     baudrate = 4800,
     parity=serial.PARITY_NONE,
     stopbits=serial.STOPBITS_ONE,
@@ -26,14 +51,18 @@ ser = serial.Serial(
     timeout=0.5
 )
 
-#for buzzer
-def beep():
-    for x in range(1100): # has to be a lot of loops
-        GPIO.output(buzzpin,GPIO.HIGH)
-        sleep(0.00025) # mimic frequency, period of corresponding freq
-        GPIO.output(buzzpin,GPIO.LOW)
-        sleep(0.00025)
-
+def speedCheck():
+    strdata = str(ser.readline())
+    if (strdata[2:8] == "$GPRMC"):
+        splitData = strdata.split(",")
+        speedMPH = float(splitData[7]) * 1.15
+        # print(str(speedMPH) + " MPH")
+        
+        if (speedMPH >= 0.0):
+            return 1
+            # update_line(50,iterator)
+        else:
+            return 0
 
 PORT_NAME = '/dev/ttyUSB0'
 
@@ -55,6 +84,7 @@ def update_line(num, iterator):
     global GLOBAL_WALL_R
     global GLOBAL_OBJ_L
     global GLOBAL_OBJ_R
+    global GLOBAL_CLOSE
     # print(np.radians(meas[1]) for meas in scan)
     # intens = np.array([meas[0] for meas in scan])
 
@@ -70,10 +100,15 @@ def update_line(num, iterator):
     cartesian_arrR = []  # x,y format
     degrees_arr = []
 
-
-
+    close = 0
+    OBJ_CLOSE = 0
+    
     for i in offsets:
-        if i[2] < 5000: # TESTING PLEASE REMOVE THIS
+        if i[2] < 1000: # is something really close
+            close = close + 1
+            if close > 5:
+                OBJ_CLOSE = 1
+        if i[2] < 5000: # TESTING PLEASE REMOVE THIS, distance
             if i[1] >= 4.71239 or i[1] <= 1.5708: # 5.23 is 300, 1.04 is 60
                 # print(i)
                 # 30 = 0.523599
@@ -137,7 +172,8 @@ def update_line(num, iterator):
                 
                 if (GLOBAL_OBJ_L > 3):
                     left.on()
-                    beep()
+                    if(OBJ_CLOSE == 1 and speedCheck() == 1):
+                        beep()
             if (GLOBAL_WALL_L > 0):    
                 GLOBAL_WALL_L = GLOBAL_WALL_L - 1
         elif object_countL >= object_wall:
@@ -194,7 +230,8 @@ def update_line(num, iterator):
                 
                 if (GLOBAL_OBJ_R > 3):
                     right.on()
-                    beep()
+                    if(OBJ_CLOSE == 1 and speedCheck() == 1):
+                        beep()
             if (GLOBAL_WALL_R > 0):   
                 GLOBAL_WALL_R = GLOBAL_WALL_R - 1
         elif object_countR >= object_wall:
@@ -240,16 +277,9 @@ def update_line(num, iterator):
 
 def run():
     lidar = RPLidar(PORT_NAME)
-    iterator = lidar.iter_scans(400)
+    iterator = lidar.iter_scans(1000) #400
     while(1):
-        strdata = str(ser.readline())
-        if (strdata[2:8] == "$GPRMC"):
-            splitData = strdata.split(",")
-            speedMPH = float(splitData[7]) * 1.15
-            # print(str(speedMPH) + " MPH")
-            
-            if (speedMPH == 0.0):
-                update_line(50,iterator)
+        update_line(50,iterator)
                     
     lidar.stop()
     lidar.disconnect()
