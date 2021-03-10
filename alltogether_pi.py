@@ -5,21 +5,21 @@ import numpy as np
 import serial
 import math
 from time import sleep
-# import csv
 left = LED(5)
 right = LED(6)
+
 # for audio
-# for audio
-import RPi.GPIO as GPIO
-from time import sleep
+import pigpio
+pi1 = pigpio.pi()
 buzzpin = 13 # 22 og, 26 new, 13
-GPIO.setmode(GPIO.BCM) # gpio numbering
+pi1.hardware_PWM(buzzpin, 0, 0)
+'''GPIO.setmode(GPIO.BCM) # gpio numbering
 GPIO.setup(buzzpin,GPIO.OUT)
 # new
 GPIO.output(buzzpin, GPIO.LOW)
-pwm = GPIO.PWM(buzzpin, 1400) # Set Frequency to 1 KHz
-pwm.start(0) # Set the starting Duty Cycle
-
+#pwm = GPIO.PWM(buzzpin, 1400) # Set Frequency to 1 KHz
+#pwm.start(0) # Set the starting Duty Cycle
+'''
 #for buzzer
 def beep():
     """
@@ -30,14 +30,18 @@ def beep():
         pwm.ChangeDutyCycle(dc)
         sleep(0.001)
     """
+    
+    '''
     dc = 0
     pwm.ChangeDutyCycle(50)
     while dc < 700000: # 101
         dc = dc + 1
         #pwm.ChangeDutyCycle(dc)
         #time.sleep(0.001)
-    pwm.ChangeDutyCycle(0)
-
+    pwm.ChangeDutyCycle(0)'''
+    pi1.hardware_PWM(buzzpin, 1400, 250000)
+    
+    #pi1.hardware_PWM(buzzpin, 0, 250000)
 
 #for GPS
 # import serial
@@ -56,7 +60,7 @@ def speedCheck():
     if (strdata[2:8] == "$GPRMC"):
         splitData = strdata.split(",")
         speedMPH = float(splitData[7]) * 1.15
-        # print(str(speedMPH) + " MPH")
+        #print(str(speedMPH) + " MPH")
         
         if (speedMPH >= 0.0):
             return 1
@@ -184,6 +188,7 @@ def update_line(num, iterator):
                 
                 if (GLOBAL_WALL_L > 3):
                     left.off()
+                    pi1.hardware_PWM(buzzpin, 0, 0)
             if (GLOBAL_OBJ_L > 0):    
                 GLOBAL_OBJ_L = GLOBAL_OBJ_L - 1
         else:
@@ -197,6 +202,7 @@ def update_line(num, iterator):
             
             if (GLOBAL_WALL_L < 4 and GLOBAL_OBJ_L < 4):
                 left.off()
+                pi1.hardware_PWM(buzzpin, 0, 0)
 
     ###########################################copy starts#####################################################
     conditionR = 1
@@ -242,6 +248,7 @@ def update_line(num, iterator):
                 
                 if (GLOBAL_WALL_R > 3):
                     right.off()
+                    pi1.hardware_PWM(buzzpin, 0, 0)
             if (GLOBAL_OBJ_R > 0):    
                 GLOBAL_OBJ_R = GLOBAL_OBJ_R - 1
         else:
@@ -255,6 +262,7 @@ def update_line(num, iterator):
             
             if (GLOBAL_WALL_R < 4 and GLOBAL_OBJ_R < 4):
                 right.off()
+                pi1.hardware_PWM(buzzpin, 0, 0)
 
 
     #  30 = 0.523599
@@ -276,11 +284,17 @@ def update_line(num, iterator):
 
 
 def run():
+    left.on()
+    right.on()
+    sleep(0.25)
+    left.off()
+    right.off()
+    sleep(0.25)
+    
     lidar = RPLidar(PORT_NAME)
     iterator = lidar.iter_scans(1000) #400
     while(1):
-        update_line(50,iterator)
-                    
+        update_line(50,iterator)       
     lidar.stop()
     lidar.disconnect()
 
