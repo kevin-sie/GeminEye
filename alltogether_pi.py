@@ -231,7 +231,7 @@ def update_line(num, iterator):
         if object_countR >= object_threshold and object_countR < object_wall:
             print("RIGHT !!! OBJECT DETECTED, LED ON !!!")
             
-            if (GLOBAL_OBJ_L < 7):
+            if (GLOBAL_OBJ_R < 7):
                 GLOBAL_OBJ_R = GLOBAL_OBJ_R + 1
                 
                 if (GLOBAL_OBJ_R > 3):
