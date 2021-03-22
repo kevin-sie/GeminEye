@@ -137,7 +137,7 @@ def update_line(num, iterator):
 
     line_threshold = 200  # how long can you deviate from the original point
     object_threshold = 15  # how many points to be an object, probably has to be higher // was 15
-    object_wall = 40
+    object_wall = 30
     object_countL = 0
     object_countR = 0
 
