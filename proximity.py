@@ -13,32 +13,10 @@ import pigpio
 pi1 = pigpio.pi()
 buzzpin = 13 # 22 og, 26 new, 13
 pi1.hardware_PWM(buzzpin, 0, 0)
-'''GPIO.setmode(GPIO.BCM) # gpio numbering
-GPIO.setup(buzzpin,GPIO.OUT)
-# new
-GPIO.output(buzzpin, GPIO.LOW)
-#pwm = GPIO.PWM(buzzpin, 1400) # Set Frequency to 1 KHz
-#pwm.start(0) # Set the starting Duty Cycle
-'''
+
 #for buzzer
 def beep():
-    """
-    for dc in range(0, 101, 1):
-        pwm.ChangeDutyCycle(dc)
-        sleep(0.001)
-    for dc in range(100, -1, -1):
-        pwm.ChangeDutyCycle(dc)
-        sleep(0.001)
-    """
-    
-    '''
-    dc = 0
-    pwm.ChangeDutyCycle(50)
-    while dc < 700000: # 101
-        dc = dc + 1
-        #pwm.ChangeDutyCycle(dc)
-        #time.sleep(0.001)
-    pwm.ChangeDutyCycle(0)'''
+
     pi1.hardware_PWM(buzzpin, 1400, 250000)
     
     #pi1.hardware_PWM(buzzpin, 0, 250000)
@@ -80,7 +58,7 @@ GLOBAL_OBJ_L = 0
 GLOBAL_OBJ_R = 0
 GLOBAL_BUZZ = 0
 GLOBAL_CLOSE_LAST = 0
-GLOBAL CLOSE = 0
+GLOBAL_CLOSE = 0
 
 # filename = "cartesian_arr.csv"
 
@@ -115,7 +93,7 @@ def update_line(num, iterator):
     for i in offsets:
         if i[2] < 1200: # is something really close
             if i[1] <= 1.075 or i[1] >= 5.2: # 60 and 300
-            close = close + 1
+                close = close + 1
             if close > 5:
                 OBJ_CLOSE = 1
         if i[2] < 5000: # TESTING PLEASE REMOVE THIS, distance
@@ -137,8 +115,6 @@ def update_line(num, iterator):
                     cartesian_tupleR = (i[2]*math.cos(i[1]), i[2]*math.sin(i[1]))  # (r*cos(degrees),r*sin(degrees))
                     cartesian_arrR.append(cartesian_tupleR)  # add to cartesian array
                     
-    GLOBAL_CLOSE_LAST = GLOBAL_CLOSE
-    GLOBAL_CLOSE = OBJ_CLOSE
     
 
     # do something with cartesian array now
@@ -152,7 +128,8 @@ def update_line(num, iterator):
     bufferL = 0
     bufferR = 0
     buffer_amt = 7
-    if(OBJ_CLOSE == 1 and GLOBAL_CLOSE_LAST == 1) or (OBJ_CLOSE == 0 and GLOBAL_CLOSE_LAST == 0):
+    
+    if(OBJ_CLOSE == 0):
         GLOBAL_BUZZ = 0
         pi1.hardware_PWM(buzzpin, 0, 0)
     else:
