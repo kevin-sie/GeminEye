@@ -1,0 +1,57 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <iostream>
+
+char knotstart[] = "$GPRMC";
+char target[] = "$GPRMC,161229.487,A,3723.2475,N,12158.3416,W,0.13,309.62,120598,,,A*10";
+int num_comma = 8;
+int pos7 = -1;
+int pos8;
+double speed;
+std::string speedstr;
+
+char* p;
+int pos;
+int i;
+int counter = 0;
+
+int main()
+{
+    p = strstr(target, knotstart);
+    if(p){
+       p = strstr(target, knotstart);
+       pos = p - target;
+       printf("It starts here %d \nlength of target is: %d \n", pos, strlen(target));
+       for(i = pos; i<strlen(target);i = i + 1)
+       {
+           //printf("%d",i);
+           if(target[i] == ',')
+           {
+               //printf("this is i: %d\n", i);
+               counter++;
+           }
+           if (counter == 7)
+           {
+               if (pos7 == -1) {
+                   pos7 = i;
+               }
+           }
+           if (counter == num_comma)
+           {
+                pos8 = i;
+                
+                std::string sp = target;
+                
+                int length = pos8 - pos7 - 1;
+                speedstr = sp.substr(pos7 + 1, length);
+                speed = std::stod(speedstr);
+                std::cout << "The speed is " << speed;
+                break;
+           }
+       }
+       
+    }
+
+    return 0;
+}
