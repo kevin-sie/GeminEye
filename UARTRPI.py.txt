@@ -1,0 +1,27 @@
+# Basic UART Communication setup, Will have to adjust when we have testing enviornment
+# Important: All UARTs on the Raspberry Pi are 3.3V only - damage will occur if they are connected to 5V systems
+# https://www.engineersgarage.com/raspberrypi/articles-raspberry-pi-serial-communication-uart-protocol-ttl-port-usb-serial-boards/
+import time
+import serial
+
+
+# Port is /dev/ttyAMA0 - Primary UART
+port = serial.Serial("/dev/ttyAMA0", baudrate=115200,parity=serial.PARITY_NONE,stopbits=serial.STOPBITS_ONE,bytesize=serial.EIGHTBITS,timeout=1)
+
+
+def readInput(port): # Reads all chars untill blank
+    rcv = ""
+    while True:
+        c = port.read()
+        rcv += c
+        if c =='':
+            return rcv
+
+while(1):  # Writes data from rcv line
+    port.write("Begin")
+    time.sleep(.01)
+    rcv = readInput(port)
+    port.write(rcv)
+    time.sleep(.01)
+    port.write("End")
+
