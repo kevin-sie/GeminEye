@@ -1,0 +1,304 @@
+// Attempting to get PWM to work
+#define _SUPPRESS_PLIB_WARNING 
+#include <p32xxxx.h>                // include chip specific header file
+#include <xc.h>                     // Not sure what this is, but included with config bits code generation. Probably related to compiler
+#include <plib.h>                   // include peripheral library functions
+ 
+//#include "PicConfig.h"              // device config bits
+ 
+#include <cstdlib>
+#include <stdio.h>
+#include <string.h>
+
+
+//M5's Configuration Bits
+#pragma config FNOSC = FRCPLL       // Internal Fast RC oscillator (8 MHz) w/ PLL
+#pragma config FPLLIDIV = DIV_2     // Divide FRC before PLL (now 4 MHz)
+#pragma config FPLLMUL = MUL_20     // PLL Multiply (now 80 MHz)
+#pragma config FPLLODIV = DIV_2     // Divide After PLL (now 40 MHz)
+                                    // see figure 8.1 in datasheet for more info
+#pragma config FWDTEN = OFF         // Watchdog Timer Disabled
+#pragma config ICESEL = ICS_PGx1    // ICE/ICD Comm Channel Select
+#pragma config JTAGEN = OFF         // Disable JTAG
+#pragma config FSOSCEN = OFF        // Disable Secondary Oscillator
+#pragma config FPBDIV = DIV_1       // PBCLK = SYCLK
+
+// Defines
+#define SYSCLK 40000000L
+
+// Macros from M5
+// Equation to set baud rate from UART reference manual equation 21-1
+#define Baud2BRG(desired_baud)      ( (SYSCLK / (16*desired_baud))-1)
+
+// Ian's pin setup
+//#pragma config U1RXR = 0b0010 // U1RX GPS, RPA4
+//#pragma config U2RXR = 0b0011 // LIDAR, RPB11
+//#pragma config RPA1R = 0101 // OC2, PWM config TODO
+//
+//#pragma config RPA0R = 0001 // U1TX, LEDs
+//#pragma config RPB0R = 0010 // U2TX, LEDs
+
+
+
+
+// not needed with M5 helper function
+//#pragma config U1BRG = // 9600
+//#pragma config U2BRG = // 115200
+
+using namespace std;
+
+// function prototypes
+int UART1Configure( int baud);
+int UART2Configure( int baud);
+int SerialTransmit1(const char *buffer); // unit8_t try
+int SerialTransmit2(const char *buffer); // unit8_t try
+unsigned int SerialReceive1(char *buffer, unsigned int max_size);
+unsigned int SerialReceive2(char *buffer, unsigned int max_size);
+void delay_ms(unsigned t);
+
+// global variables
+int foundL = 0;
+int foundR = 0;
+char knotstart[] = "$GPRMC"; // starting point
+int num_comma = 7; // after 7 commas, knots is there
+int speed = 0;
+
+int main(void) 
+{
+    //Peripheral Pin Select configuration
+    U1RXRbits.U1RXR = 0b0010; // U1RX GPS, RPA4
+    U2RXRbits.U2RXR = 0b0011; // LIDAR, RPB11
+    RPA1Rbits.RPA1R = 0b0101; // OC2, PWM config TODO
+    RPA0Rbits.RPA0R = 0b0001; // U1 TX LEDS
+    // RPB0Rbits.RPB0R = 0b0010; // U2 TX LEDS
+    
+    //RPB10Rbits.RPB10R = 0b0010; // for LiDAR request then switch back
+    RPB10Rbits.RPB10R = 0b0010; // for LiDAR request then switch back
+    
+    //LED stuff
+    SYSTEMConfigPerformance(SYSCLK);
+ 
+    ANSELB = 0;                     // Set all of PortB as digital
+    TRISBbits.TRISB5 = 0;           // RB5 -> Output
+    TRISBbits.TRISB3 = 1;           // RB3 -> Input
+//    LATBbits.LATB5 = 0;
+    
+    //UART1Configure(9600); // GPS/ 4800
+    UART2Configure(9600); // LiDAR, 115200
+
+    //char buf[1024]; // idk why this is the max size declared on M5 page
+            //while(!U2STAbits.URXDA);
+        //*buf2 = U2RXREG; // save data
+        //buf2++;
+        //if(U2STAbits.OERR == 1)
+        //{// if overflow
+        //    U2STAbits.OERR = 0;
+        //}
+    char buf[1024];
+    //int send_packet = 0xA520;
+    char sendbuf[3];
+    sendbuf[0] = 0xA5;
+    sendbuf[1] = 0x20;
+    sendbuf[2] = 0x00;
+    
+    char reset[] = {0xA5, 0x40, 0x00};
+    char sendFirst[] = {0xA5, 0xF0, 0x02, 0x94, 0x02, 0xC1,0x00}; // forgot 0x00
+    char sendSecond[] = {0xA5, 0xF0, 0x02, 0x94, 0x02, 0xC1, 0xA5, 0x52, 0x00}; 
+    char express_scan[] = {0xA5, 0x82, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x22, 0x00, 0x00};
+    char force_scan[] = {0xA5, 0x20, 0x00};
+    char express_scan2[] = {0xA5, 0x82, 0x00};
+    char start[] = "BEGIN";
+    char alertL[] = "LEFT ALERT";
+    char alertR[] = "RIGHT ALERT";
+    
+    while(1)
+    {
+        delay_ms(500);
+        SerialTransmit2("20.13\n");
+        SerialReceive2(buf, 1024);
+        if(foundL == 1){
+            //SerialTransmit1(alertL); // debugging
+            LATBbits.LATB5 = 1;
+            delay_ms(300);
+            foundL = 0;
+        }
+
+        if(foundR == 1){
+            //SerialTransmit1(alertR); // debugging
+            LATBbits.LATB5 = 0;
+            delay_ms(300);
+            foundR = 0;
+        }
+        //delay_ms(200);
+        //SerialTransmit("END");
+        
+    }
+
+    return 1;
+}
+
+// helper functions
+
+int UART1Configure( int desired_baud){
+    // M5 doesnt use pragma config here
+    //#pragma config U1MODE = 0x8000 // no parity<1-2>, 1 stop bit<0>, <15>, M5 has it as 0
+    //#pragma config U1STA = 0x00001000 // enable receive bit <12>
+    U1MODE = 0x8000;
+    U1STA = 0x00001000;
+    // M5 stuff
+    // U2MODE = 0;         // disable autobaud, TX and RX enabled only, 8N1, idle=HIGH
+    // U2STA = 0x1400;     // enable TX and RX
+    U1BRG = Baud2BRG(desired_baud); // U2BRG = (FPb / (16*baud)) - 1    
+    // Calculate actual assigned baud rate
+    int actual_baud = SYSCLK / (16 * (U1BRG+1));
+
+    return actual_baud;
+} // END UART1Configure()
+
+int UART2Configure( int desired_baud){
+    // M5 doesnt use pragma config here
+    //#pragma config U1MODE = 0x8000 // no parity<1-2>, 1 stop bit<0>, <15>, M5 has it as 0, MODESET 0x8000
+    //#pragma config U1STA = 0x00001000 // enable receive bit <12>
+    U2MODE = 0x8000; // mine
+    //U2MODE = 0;
+    U2STA = 0x1400;
+    // M5 stuff
+    // U2MODE = 0;         // disable autobaud, TX and RX enabled only, 8N1, idle=HIGH
+    // U2STA = 0x1400;     // enable TX and RX
+    U2BRG = Baud2BRG(desired_baud); // U2BRG = (FPb / (16*baud)) - 1    
+    // Calculate actual assigned baud rate
+    int actual_baud = SYSCLK / (16 * (U2BRG+1));
+
+    return actual_baud;
+} // END UART2Configure()
+
+/* SerialTransmit() transmits a string to the UART2 TX pin MSB first
+ *
+ * Inputs: *buffer = string to transmit */
+int SerialTransmit1(const char *buffer)
+{
+    
+    unsigned int size = strlen(buffer);
+    //int size = 2;
+    while(size) // different, debugging with (1) currently
+    {
+        while( U1STAbits.UTXBF);    // wait while TX buffer full
+        U2TXREG = *buffer;          // send single character to transmit buffer
+        buffer++;                   // transmit next character on following loop
+        size--;                     // loop until all characters sent (when size = 0)
+    }
+ 
+    while( !U2STAbits.TRMT);        // wait for last transmission to finish
+    
+    //RPB10Rbits.RPB10R = 0b0000; // OFF
+    return 0;
+}
+
+int SerialTransmit2(const char *buffer)
+{
+    
+    unsigned int size = strlen(buffer);
+    //int size = 2;
+    while(size) // different, debugging with (1) currently
+    {
+        while( U2STAbits.UTXBF);    // wait while TX buffer full
+        U2TXREG = *buffer;          // send single character to transmit buffer
+        buffer++;                   // transmit next character on following loop
+        size--;                     // loop until all characters sent (when size = 0)
+    }
+ 
+    while( !U2STAbits.TRMT);        // wait for last transmission to finish
+    
+    //RPB10Rbits.RPB10R = 0b0000; // OFF
+    return 0;
+}
+
+unsigned int SerialReceive1(char *buffer, unsigned int max_size)
+{
+    unsigned int num_char = 0;
+ 
+    /* Wait for and store incoming data until either a carriage return is received
+     *   or the number of received characters (num_chars) exceeds max_size */
+    while(num_char < max_size)
+    {
+        while( !U1STAbits.URXDA);   // wait until data available in RX buffer
+        // maybe its receiving too slow/fast, try a pause
+        //delay_ms(100);
+            *buffer = U1RXREG;          // empty contents of RX buffer into *buffer pointer
+
+             //insert nul character to indicate end of string
+            if( *buffer == 'L' || *buffer == 'R'){
+                if (*buffer == 'L')
+                {
+                    foundL = 1;
+                }
+                else
+                {
+                    foundR = 1;
+                }
+                // test
+                break;
+            }
+            if(U1STAbits.OERR == 1)
+            {// if overflow
+                U1STAbits.OERR = 0;
+            }
+        buffer++;
+        num_char++;
+    }
+ 
+    return num_char;
+} // END SerialReceive()
+
+unsigned int SerialReceive2(char *buffer, unsigned int max_size)
+{
+    unsigned int num_char = 0;
+ 
+    /* Wait for and store incoming data until either a carriage return is received
+     *   or the number of received characters (num_chars) exceeds max_size */
+    while(num_char < max_size)
+    {
+        while( !U2STAbits.URXDA);   // wait until data available in RX buffer
+        // maybe its receiving too slow/fast, try a pause
+        //delay_ms(100);
+        *buffer = U2RXREG;          // empty contents of RX buffer into *buffer pointer
+        
+        if(U2STAbits.OERR == 1)
+        {// if overflow
+            U2STAbits.OERR = 0;
+        }
+     //insert nul character to indicate end of string
+        if( *buffer == 'L' || *buffer == 'R'){
+            if (*buffer == 'L')
+            {
+                foundL = 1;
+            }
+            else
+            {
+                foundR = 1;
+            }
+            // test
+            break;
+        }
+
+        buffer++;
+        num_char++;
+    }
+ 
+    return num_char;
+} // END SerialReceive()
+
+// Assumes the SYSCLK and PBCLK frequencies are the same
+// Occupies Timer1
+void delay_ms( unsigned t)
+{
+    T1CON = 0x8000;     // enable Timer1, source PBCLK, 1:1 prescaler
+    while( t--)
+    {
+        TMR1 = 0;
+        while( TMR1 < SYSCLK/1000); // wait 1ms
+    }
+ 
+    // disable Timer1
+    T1CONCLR = 0x8000;
+}
