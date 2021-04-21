@@ -34,6 +34,22 @@ ser = serial.Serial(
     timeout=0.5
 )
 
+ser2 = serial.Serial(
+    port='/dev/ttyAMA5', #ttyS0 old, ttyAMA1 new
+    baudrate = 4800,
+    parity=serial.PARITY_NONE,
+    stopbits=serial.STOPBITS_ONE,
+    bytesize=serial.EIGHTBITS,
+    timeout=1
+)
+ser2.write("L".encode)) # left on
+ser2.write("M".encode)) # left off
+
+ser2.write("R".encode)) # right on
+ser2.write("S".encode)) # right stop
+
+ser2.write("T".encode)) # tailgate 
+
 def speedCheck():
     global GLOBAL_SPEEDCOUNTER
     global GLOBAL_SPEED
@@ -167,6 +183,7 @@ def update_line(num, iterator):
     if OBJ_CLOSE == 1 and GLOBAL_SPEED >= 0:
         if GLOBAL_ISON == 0:
             beep()
+            ser2.write("T".encode)) # tailgate 
             GLOBAL_ISON = 1
         elif GLOBAL_ISON == 1 and GLOBAL_COUNTER > 10:
             pi1.hardware_PWM(buzzpin, 0, 0)
@@ -209,6 +226,7 @@ def update_line(num, iterator):
                 
                 if (GLOBAL_OBJ_L > 3):
                     left.on()
+                    ser2.write("L".encode)) # left on
                     '''
                     if(OBJ_CLOSE == 1 and speedCheck() == 1):
                         beep()
@@ -223,6 +241,7 @@ def update_line(num, iterator):
                 
                 if (GLOBAL_WALL_L > 3):
                     left.off()
+                    ser2.write("M".encode)) # left off
                     # pi1.hardware_PWM(buzzpin, 0, 0)
             if (GLOBAL_OBJ_L > 0):    
                 GLOBAL_OBJ_L = GLOBAL_OBJ_L - 1
@@ -237,6 +256,7 @@ def update_line(num, iterator):
             
             if (GLOBAL_WALL_L < 4 and GLOBAL_OBJ_L < 4):
                 left.off()
+                ser2.write("M".encode)) # left off
                 # pi1.hardware_PWM(buzzpin, 0, 0)
 
     ###########################################copy starts#####################################################
@@ -271,6 +291,7 @@ def update_line(num, iterator):
                 
                 if (GLOBAL_OBJ_R > 3):
                     right.on()
+                    ser2.write("R".encode)) # right on
                     '''
                     if(OBJ_CLOSE == 1 and speedCheck() == 1):
                         beep()
@@ -285,6 +306,7 @@ def update_line(num, iterator):
                 
                 if (GLOBAL_WALL_R > 3):
                     right.off()
+                    ser2.write("S".encode)) # right stop
                     # pi1.hardware_PWM(buzzpin, 0, 0)
             if (GLOBAL_OBJ_R > 0):    
                 GLOBAL_OBJ_R = GLOBAL_OBJ_R - 1
@@ -299,6 +321,7 @@ def update_line(num, iterator):
             
             if (GLOBAL_WALL_R < 4 and GLOBAL_OBJ_R < 4):
                 right.off()
+                ser2.write("S".encode)) # right stop
                 # pi1.hardware_PWM(buzzpin, 0, 0)
 
 
