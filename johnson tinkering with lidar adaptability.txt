@@ -142,15 +142,18 @@ def update_line(num, iterator):
     
     # adaptability to code, based off feeling not mathematically yet, i dont think we can do speed difference with the other car if we only know how fast we are going
     # how to fleshout test specs? 5.5 hz typical "Typical value is  measured when RPLIDAR A1 takes 360 samples per scan"
-    if GLOBAL_SPEED > 40:
+    if GLOBAL_SPEED > 55:
         object_threshold = 12
         tailgate_dist = 3500
-    elif: GLOBAL_SPEED > 60:
+    elif: GLOBAL_SPEED > 65:
         object_threshold = 10
         tailgate_dist = 4000
-    elif: GLOBAL_SPEED > 70:
+    elif: GLOBAL_SPEED > 75:
         object_threshold = 8
         tailgate_dist = 4500
+    elif: GLOBAL_SPEED > 75:
+        object_threshold = 6
+        tailgate_dist = 5000
     elif: GLOBAL_SPEED < 30: # reset to original
         object_threshold = 15
         tailgate_dist = 3000
