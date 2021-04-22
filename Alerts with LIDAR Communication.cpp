@@ -52,8 +52,6 @@ int SerialTransmit1(const char *buffer); // unit8_t try
 int SerialTransmit2(const char *buffer); // unit8_t try
 unsigned int SerialReceive1(char *buffer, unsigned int max_size);
 unsigned int SerialReceive2(char *buffer, unsigned int max_size);
-void delay_ms(unsigned t);
-
 
 
 // Alert output settings/helper variables
@@ -68,6 +66,7 @@ int foundR = 0;
 char knotstart[] = "$GPRMC"; // starting point
 int num_comma = 7; // after 7 commas, knots is there
 int speed = 0;
+char RPiReceiveBuffer[8];
 
 
 /*
@@ -114,7 +113,7 @@ int rightAlertOff(void)
     LATBbits.LATB0 = 0b0;           // Set the LED pin LOW
 }
 
-// Timer2 Interrupt Service Routine
+// Timer2 Interrupt Service Routine (For turning on and off the speaker)
 extern "C" {void __ISR(8, IPL4AUTO) IntHandler_Timer2(void)
 {
     if(beepCNT < numBeeps){
@@ -156,30 +155,63 @@ extern "C" {void __ISR(8, IPL4AUTO) IntHandler_Timer2(void)
 } // END Timer2 ISR
 }
 
-// U2RX Interrupt Service Routine (Need to update first line)
-extern "C" {void __ISR(8, IPL4AUTO) IntHandler_U2RX(void)
-{
+// U2RX Interrupt Service Routine (For receiving Pi communications)
+extern "C" {void __ISR(37, IPL4AUTO) IntHandler_U2RX(void)
+{    
+    RPiReceiveBuffer[0] = U2RXREG;      // empty contents of RX buffer into *buffer pointer
+    
+    // Clear the receive register by raising then clearing OERR bit
+    U2STAbits.OERR = 1;
+    U2STAbits.OERR = 0;
+    
+    /*
+     * 
+     * Key for interpreting RPi communications:
+     * 
+     * L -- Turn on left LED
+     * R -- Turn on right LED
+     * M -- Turn off left LED
+     * S -- Turn off right LED
+     * A -- Play audio alert
+     * 
+     */
+    
+    if(RPiReceiveBuffer[0] == 'L'){
+        leftAlertOn();
+    }
+    
+    if(RPiReceiveBuffer[0] == 'R'){
+        rightAlertOn();
+    }
+        
+    switch(RPiReceiveBuffer[0] ){
+        case 'L':
+            leftAlertOn();
+            break;
+        
+        case 'R':
+            rightAlertOn();
+            break;
+        
+        case 'M':
+            leftAlertOff();
+            break;
+        
+        case 'S':
+            rightAlertOff();
+            break;
+            
+        case 'A':
+            beep();
+            break;
+          
+    }
+    
+    
     IFS1CLR = 0x400000;     // clear U2RX interrupt flag, IFS1<22>
 } // END U2RX ISR
 }
 
-
-// Delays for specified time
-void delay_ms( unsigned t)
-{
-    // Assumes the SYSCLK and PBCLK frequencies are the same
-    // Occupies Timer1
-    
-    T1CON = 0x8000;     // enable Timer1, source PBCLK, 1:1 prescaler
-    while( t--)
-    {
-        TMR1 = 0;
-        while( TMR1 < SYSCLK/1000); // wait 1ms
-    }
- 
-    // disable Timer1
-    T1CONCLR = 0x8000;
-}
 
 /*
  * UART Helper Functions
@@ -220,9 +252,9 @@ int UART2Configure( int desired_baud){
     return actual_baud;
 } // END UART2Configure()
 
-/* SerialTransmit() transmits a string to the UART2 TX pin MSB first
- *
- * Inputs: *buffer = string to transmit */
+// SerialTransmit() transmits a string to the UART2 TX pin MSB first
+//
+// Inputs: *buffer = string to transmit
 int SerialTransmit1(const char *buffer)
 {
 
@@ -315,7 +347,7 @@ unsigned int SerialReceive2(char *buffer, unsigned int max_size)
         {// if overflow
             U2STAbits.OERR = 0;
         }
-     //insert null character to indicate end of string
+
         if( *buffer == 'L' || *buffer == 'R'){
             if (*buffer == 'L')
             {
@@ -391,33 +423,25 @@ int main(void)
  */    
     
     //Peripheral Pin Select configuration
-    U1RXRbits.U1RXR = 0b0010; // U1RX GPS, RPA4
-    U2RXRbits.U2RXR = 0b0011; // RPi, RPB11
-
-    RPB10Rbits.RPB10R = 0b0010; // for RPi request then switch back
-
-
+    U1RXRbits.U1RXR = 0b0010; // U1RX for GPS, RPA4, Pin 12
+    U2RXRbits.U2RXR = 0b0011; // U2RX for RPi, RPB11, D- or Pin 22 on Pic32MX270F256B
+    //Not sure the next line is right, need to do something to this effect though
+    RPB10R.U2TXR = 0b0010; // U2TX for RPi, RPB10, D+ or Pin 21 on Pic32MX270F256B 
+ 
+    
     //UART1Configure(9600); // GPS/ 4800
-    UART2Configure(9600); // LiDAR, 115200
-
-    char buf[1024];
-
-    char start[] = "BEGIN";
-    char alertL[] = "LEFT ALERT";
-    char alertR[] = "RIGHT ALERT";
+    UART2Configure(4800); // LiDAR, 115200
     
  /*
- * Setup for U2RX Interrupt
+ * Setup for U2RX Interrupt (For RPi Communication)
  */   
     
-    // Configuration (copied Timer2, needs to be redone)
     IEC1CLR = 0x400000;     // disable U2RX interrupt, IEC1<22>
     IFS1CLR = 0x400000;     // clear U2RX interrupt flag, IFS1<22>
     IPC9CLR = 0x001f00;     // clear U2RX interrupt priority/subpriority fields IPC9<12:8>
-    IPC9SET = 0x004000;     // set U2RX interrupt priority = 4, IPC9<12:10>
+    IPC9SET = 0x001000;     // set U2RX interrupt priority = 4, IPC9<12:10>
     IPC9SET = 0x000100;     // set U2RX interrupt subpriority = 1, IPC9<9:8>
     IEC1SET = 0x400000;     // enable U2RX interrupt, IEC1<22>
-
     
     // loop indefinitely
     while(1){
